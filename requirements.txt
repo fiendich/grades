@@ -1,0 +1,5 @@
+flask
+Flask-SQLAlchemy
+flask-login
+gunicorn==20.1.0
+Flask-WTF>=1.0.0

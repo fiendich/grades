@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% block title %}Noten{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+#noten-header { text-align: center; margin-bottom: 2rem; }
+#noten-header .schueler-info { font-size: 2.2rem; font-weight: bold; }
+#noten-header .schuljahr { font-size: 1.1rem; color: #888; margin-top: 0.2rem; }
+#noten-header .stats { margin-top: 1rem; font-size: 1.1rem; }
+#noten-header .stats .avg { font-size: 1.5rem; font-weight: bold; display: inline-block; margin-right: 1.5rem; padding: 0.2em 1em; border-radius: 1em; }
+#noten-header .avg-green { background: #e6f4ea; color: #218838; }
+#noten-header .avg-yellow { background: #fffbe6; color: #b8860b; }
+#noten-header .avg-red { background: #f8d7da; color: #721c24; }
+#noten-header .stats .count { color: #555; }#noten-header .back-btn { position: absolute; left: 2vw; top: 4vw; }
+#noten-header .back-btn button { background: #e0e0e0; border: none; border-radius: 2rem; padding: 0.4rem 1.2rem; font-weight: bold; }
+#noten-header .back-btn button:hover { background: #bdbdbd; }
+#noten-header .quick-actions { margin-top: 1.2rem; display: flex; justify-content: center; gap: 1rem; }
+#noten-header .quick-actions button { font-size: 1.1rem; border-radius: 2rem; padding: 0.5rem 1.2rem; border: none; background: #1976d2; color: #fff; font-weight: bold; transition: background 0.2s; }
+#noten-header .quick-actions button:hover { background: #125ea2; }
+#subject-tabs { display: flex; flex-wrap: wrap; border-bottom: 2px solid #1976d2; margin-bottom: 1.5rem; overflow-x: auto; }
+#subject-tabs .tab { color: #1976d2; background: #f8f9fa; padding: 0.8rem 2rem; font-size: 1.1rem; border: none; border-radius: 0.5rem 0.5rem 0 0; margin-right: 0.2rem; cursor: pointer; transition: background 0.2s, color 0.2s; }
+#subject-tabs .tab.active { background: #fff; color: #1976d2; border-bottom: 2px solid #fff; font-weight: bold; border-bottom: 3px solid #1976d2; }
+.grade-table th, .grade-table td { text-align: center; vertical-align: middle; font-size: 1.05rem; }
+.grade-table th { background: #f8f9fa; }
+.grade-table .note-green { background: #e6f4ea; color: #218838; font-weight: bold; }
+.grade-table .note-yellow { background: #fffbe6; color: #b8860b; font-weight: bold; }
+.grade-table .note-red { background: #f8d7da; color: #721c24; font-weight: bold; }
+.grade-table .action-icons { opacity: 0; transition: opacity 0.2s; }
+.grade-table tr:hover .action-icons { opacity: 1; }
+.grade-table tr:hover { background: #f2f2f2; }
+.grade-table .influence { font-size: 0.95rem; }
+#note-modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: center; }
+#note-modal .modal-content { background: #fff; border-radius: 1rem; padding: 2rem 2.5rem; min-width: 320px; max-width: 95vw; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+#note-modal label { font-weight: bold; }
+@media (max-width: 767px) { #noten-header .schueler-info { font-size: 1.2rem; } #noten-header .stats .avg { font-size: 1.1rem; } #subject-tabs { flex-direction: column; } #subject-tabs .tab { padding: 0.7rem 1rem; font-size: 1rem; } .grade-table, .grade-table thead, .grade-table tbody, .grade-table tr, .grade-table th, .grade-table td { display: block; width: 100%; } .grade-table tr { margin-bottom: 1.2rem; border-bottom: 1px solid #eee; } .grade-table th { display: none; } .grade-table td { text-align: left; padding: 0.5rem 0; } .grade-table .action-icons { float: right; } }
+.schueler-info-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  border-radius: 1.5rem;
+  padding: 1.1rem 2.2rem;
+  font-size: 1.25rem;
+  font-weight: 500;
+  margin-bottom: 1.5rem;
+}
+.schueler-info-card i {
+  color: #1976d2;
+  font-size: 1.7rem;
+}
+.schueler-info-card .schueler-name {
+  font-weight: bold;
+  font-size: 1.3rem;
+}
+.schueler-info-card .schueler-class {
+  color: #555;
+  font-size: 1.1rem;
+}
+.schueler-info-card .schuljahr {
+  color: #888;
+  font-size: 1.05rem;
+  margin-left: 0.7rem;
+}
+</style>
+<div id="noten-header">
+  <div class="schueler-info-card">
+    <span class="schueler-name">{{ selected_student.first_name }} {{ selected_student.last_name }}</span>
+    <span class="schueler-class">{{ selected_student.class_.name }}</span>
+    <span class="schuljahr">2024/25</span>
+  </div>
+  {% set all_grades = grades %}
+  {% set total = 0 %}
+  {% set weight_sum = 0 %}
+  {% for grade in all_grades %}
+    {% set total = total + (grade.value * grade.weight) %}
+    {% set weight_sum = weight_sum + grade.weight %}
+  {% endfor %}
+  {% set avg = (total / weight_sum) if weight_sum > 0 else None %}
+
+ </div>
+<div id="subject-tabs">
+  {% for subject in subjects %}
+    <button class="tab{% if selected_subject_id is not none and subject.id == selected_subject_id %} active{% elif selected_subject_id is none and loop.first %} active{% endif %}" data-subject-id="{{ subject.id }}">{{ subject.name }}</button>
+  {% endfor %}
+</div>
+{% for subject in subjects %}
+<div class="subject-panel" id="subject-panel-{{ subject.id }}" style="display: {% if (selected_subject_id is not none and subject.id == selected_subject_id) or (selected_subject_id is none and loop.first) %}block{% else %}none{% endif %};">
+  <table class="table grade-table mb-0">
+    <thead>
+      <tr>
+        <th>Datum</th>
+        <th>Note</th>
+        <th>Art</th>
+        <th>Gewichtung</th>
+        <th>Kommentar</th>
+        <th>Aktionen</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% set subject_grades = [] %}
+      {% for grade in grades if grade.subject_id == subject.id %}
+        {% set _ = subject_grades.append(grade) %}
+        <tr>
+          <td>{{ grade.date.strftime('%d.%m.%Y') if grade.date else '' }}</td>
+          <td class="{% if grade.value <= 2 %}note-green{% elif grade.value <= 4 %}note-yellow{% else %}note-red{% endif %}">{{ grade.value }}</td>
+          <td>{{ grade.note_type }}</td>
+          <td>{{ grade.weight|round(1) }}x</td>
+          <td>{{ grade.kommentar or '' }}</td>
+          <td>
+            <span class="action-icons">
+              <a href="#" onclick="editNote({{ grade.id }}, {{ subject.id }})" title="Bearbeiten"><i class="fa fa-pen"></i></a>
+              <form method="POST" action="/grades/delete/{{ grade.id }}" style="display:inline;">
+                <button type="submit" class="btn btn-link p-0" title="Löschen"><i class="fa fa-trash"></i></button>
+              </form>
+            </span>
+          </td>
+        </tr>
+      {% endfor %}
+      {% if not subject_grades %}
+        <tr><td colspan="6" class="text-center">Keine Noten vorhanden</td></tr>
+      {% endif %}
+      <!-- Inline Add Row -->
+      <tr id="add-row-{{ subject.id }}" style="display:none;">
+        <form method="POST" action="/grades/add">
+          <td><input type="text" name="date" class="form-control" value="{{ today }}" required></td>
+          <td>
+            <select name="value" class="form-control" required>
+              {% for n in range(1,7) %}
+                <option value="{{ n }}">{{ n }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td>
+            <select name="note_type" class="form-control" onchange="setWeightByTypeInline(this, '{{ subject.id }}')" required>
+              <option value="Schulaufgabe">Schulaufgabe</option>
+              <option value="Kurzarbeit">Kurzarbeit</option>
+              <option value="Ex">Ex</option>
+            </select>
+          </td>
+          <td><input type="number" name="weight" id="weight-input-{{ subject.id }}" step="0.1" class="form-control" value="2.0" required></td>
+          <td><input type="text" name="kommentar" class="form-control"></td>
+          <td>
+            <input type="hidden" name="student_id" value="{{ selected_student.id }}">
+            <input type="hidden" name="subject_id" value="{{ subject.id }}">
+            <button type="submit" class="btn btn-success btn-sm"><i class="fa fa-check"></i></button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="hideAddRow('{{ subject.id }}')"><i class="fa fa-times"></i></button>
+          </td>
+        </form>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="6" class="text-center">
+          <button type="button" class="btn btn-link" onclick="showAddRow('{{ subject.id }}')"><i class="fa fa-plus"></i> Note einfügen</button>
+        </td>
+      </tr>
+      <tr style="font-weight:bold; font-size:1.1rem;">
+        <td>Ø</td>
+        <td>
+          {% set ns = namespace(fach_total=0, fach_weight_sum=0) %}
+          {% for grade in subject_grades %}
+            {% set ns.fach_total = ns.fach_total + (grade.value * grade.weight) %}
+            {% set ns.fach_weight_sum = ns.fach_weight_sum + grade.weight %}
+          {% endfor %}
+          {% set avg_fach = (ns.fach_total / ns.fach_weight_sum) if ns.fach_weight_sum > 0 else None %}
+          {% if avg_fach is not none %}{{ avg_fach|round(2) }}{% else %}-{% endif %}
+        </td>
+        <td colspan="4"></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+{% endfor %}
+<script>
+const tabs = document.querySelectorAll('#subject-tabs .tab');
+const panels = document.querySelectorAll('.subject-panel');
+const selectedSubjectId = {{ selected_subject_id if selected_subject_id is not none else 'null' }};
+if (selectedSubjectId) {
+  tabs.forEach((tab, idx) => {
+    if (parseInt(tab.getAttribute('data-subject-id')) === selectedSubjectId) {
+      tabs.forEach(t => t.classList.remove('active'));
+      panels.forEach(p => p.style.display = 'none');
+      tab.classList.add('active');
+      panels[idx].style.display = 'block';
+    }
+  });
+}
+tabs.forEach((tab, idx) => {
+  tab.addEventListener('click', function() {
+    tabs.forEach(t => t.classList.remove('active'));
+    panels.forEach(p => p.style.display = 'none');
+    tab.classList.add('active');
+    panels[idx].style.display = 'block';
+    document.getElementById('modal-subject').value = tab.getAttribute('data-subject-id');
+  });
+});
+function openNoteModal() {
+  document.getElementById('note-modal').style.display = 'flex';
+  const activeTab = document.querySelector('#subject-tabs .tab.active');
+  if (activeTab) {
+    document.getElementById('modal-subject').value = activeTab.getAttribute('data-subject-id');
+  }
+}
+function closeNoteModal() {
+  document.getElementById('note-modal').style.display = 'none';
+}
+function setWeightByType() {
+  const type = document.getElementById('modal-note-type').value;
+  let weight = 1.0;
+  if (type === 'Schulaufgabe') weight = 2.0;
+  else if (type === 'Kurzarbeit' || type === 'Mündlich') weight = 1.0;
+  else if (type === 'Ex') weight = 1.0;
+  document.getElementById('modal-weight').value = weight;
+}
+function editNote(gradeId, subjectId) {
+  openNoteModal();
+  document.getElementById('modal-subject').value = subjectId;
+}
+function showAddRow(subjectId) {
+  document.getElementById('add-row-' + subjectId).style.display = '';
+}
+function hideAddRow(subjectId) {
+  document.getElementById('add-row-' + subjectId).style.display = 'none';
+}
+function setWeightByTypeInline(select, subjectId) {
+  let weightInput = document.getElementById('weight-input-' + subjectId);
+  let type = select.value;
+  if (type === 'Schulaufgabe') weightInput.value = 2.0;
+  else if (type === 'Kurzarbeit') weightInput.value = 1.0;
+  else if (type === 'Ex') weightInput.value = 1.0;
+}
+</script>
+{% endblock %}
+

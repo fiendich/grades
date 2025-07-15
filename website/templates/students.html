@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Students{% endblock %}
+{% block content %}
+<h2 align="center">Schülerübersicht</h2>
+<div class="form-group">
+  <label for="classSelect">Wähle eine Klasse:</label>
+  <select name="class_id" id="classSelect" class="form-control" required>
+    <option value="">-- auswählen --</option>
+    {% for klass in classes %}
+      <option value="{{ klass.id }}" {% if klass.id == selected_class_id %}selected{% endif %}>{{ klass.name }}</option>
+    {% endfor %}
+  </select>
+</div>
+<div id="students-container" class="mt-4">
+  <ul class="list-group">
+    {% for student in students %}
+      <li class="list-group-item">
+        <form method="GET" action="/grades/table" style="display:inline;">
+          <input type="hidden" name="class_id" value="{{ selected_class_id }}">
+          <input type="hidden" name="student_id" value="{{ student.id }}">
+          <button type="submit" class="btn btn-link p-0" style="font-size:1.1rem; text-decoration:underline; color:#1976d2;">
+            {{ student.first_name }} {{ student.last_name }}
+          </button>
+        </form>
+      </li>
+    {% endfor %}
+    {% if students|length == 0 %}
+      <li class="list-group-item text-muted">Keine Schüler in dieser Klasse.</li>
+    {% endif %}
+  </ul>
+</div>
+<script>
+document.getElementById('classSelect').addEventListener('change', function() {
+  var classId = this.value;
+  var container = document.getElementById('students-container');
+  if (!classId) {
+    container.innerHTML = '<ul class="list-group"><li class="list-group-item text-muted">Keine Schüler in dieser Klasse.</li></ul>';
+    return;
+  }
+  fetch('/api/students?class_id=' + classId)
+    .then(response => response.json())
+    .then(data => {
+      let html = '<ul class="list-group">';
+      if (data.students.length === 0) {
+        html += '<li class="list-group-item text-muted">Keine Schüler in dieser Klasse.</li>';
+      } else {
+        data.students.forEach(student => {
+          html += `<li class="list-group-item">
+            <form method="GET" action="/grades/table" style="display:inline;">
+              <input type="hidden" name="class_id" value="${classId}">
+              <input type="hidden" name="student_id" value="${student.id}">
+              <button type="submit" class="btn btn-link p-0" style="font-size:1.1rem; text-decoration:underline; color:#1976d2;">
+                ${student.first_name} ${student.last_name}
+              </button>
+            </form>
+          </li>`;
+        });
+      }
+      html += '</ul>';
+      container.innerHTML = html;
+    });
+});
+</script>
+{% endblock %} 
