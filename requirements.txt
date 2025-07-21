@@ -3,3 +3,5 @@ Flask-SQLAlchemy
 flask-login
 gunicorn==20.1.0
 Flask-WTF>=1.0.0
+tzdata
+backports.zoneinfo; python_version<'3.9'
