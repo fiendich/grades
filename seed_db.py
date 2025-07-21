@@ -5,9 +5,9 @@ from werkzeug.security import generate_password_hash
 from datetime import datetime
 
 with app.app_context():
-    # Lehrer mit Kürzel anlegen
-    lehrer1 = User(email="szt@schule.de", password="demo", kuerzel="szt")
-    lehrer2 = User(email="sst@schule.de", password="demo", kuerzel="sst")
+    # Lehrer mit Kürzel anlegen (Passwort gehasht!)
+    lehrer1 = User(email="szt@schule.de", password=generate_password_hash("demo", method="sha256"), kuerzel="szt")
+    lehrer2 = User(email="sst@schule.de", password=generate_password_hash("demo", method="sha256"), kuerzel="sst")
     db.session.add_all([lehrer1, lehrer2])
     db.session.commit()
 
@@ -74,4 +74,4 @@ with app.app_context():
     db.session.add_all(grades)
     db.session.commit()
 
-    print("Seeded database with 2 Klassen, je 10 Schüler, und Beispielnoten.") 
+    print("Seeded database with 2 Klassen, je 10 Schüler, und Beispielnoten (Lehrerpasswörter gehasht).") 

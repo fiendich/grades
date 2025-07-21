@@ -1,57 +1,55 @@
-# Flask Notes Web Application
+# Grades Web Application
 
-## Live-link https://notesapp-rad4.onrender.com
+## Overview
 
-The Flask Notes Web Application is a feature-rich web platform designed to provide users with a convenient and efficient way to create, organize, and manage their notes. Built using Flask, SQLAlchemy, Jinja, and Python, this application offers a seamless user experience combined with robust functionality.
+Grades is a web application for teachers to manage students, classes, and grades efficiently. It supports bulk grade entry, secure authentication, and a modern, user-friendly interface.
 
-## Key Features:
+## Features
 
-1. User Authentication and Authorization:
+- User authentication (sign up, login, logout)
+- Teacher-specific class and student management
+- Add, edit, and delete grades for students
+- Bulk grade entry for entire classes
+- Responsive design (Bootstrap)
+- Secure password hashing
+- SQLite database (local, not tracked in git)
 
-* Users can register and create their accounts.
-* Secure login and password hashing ensure data privacy.
-* Role-based access control allows administrators to manage user permissions.
+## Quickstart
 
-2. Note Creation and Organization:
+1. **Clone the repository:**
+   ```bash
+   git clone <repo-url>
+   cd Grades
+   ```
+2. **Create a virtual environment and install dependencies:**
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
+3. **Initialize the database:**
+   ```bash
+   python init_db.py
+   python seed_db.py  # (optional) Add demo data
+   ```
+4. **Run the app:**
+   ```bash
+   python main.py
+   ```
+5. **Open in browser:**
+   Visit [http://localhost:5000](http://localhost:5000)
 
-* Users can create, edit, and delete notes.
-* Notes can be organized into categories or tags for easy navigation.
-* Rich text editing capabilities enable users to format their notes.
+## Database
+- The app uses a local SQLite database (`website/database.db`).
+- This file is ignored by git (see `.gitignore`).
+- To reset, simply delete the file and re-run `init_db.py` and `seed_db.py`.
 
-3. Search and Filtering:
+## .gitignore
+- `website/database.db` is ignored to prevent local/test data from being committed.
 
-* Users can search for specific notes using keywords or tags.
-* Filtering options help users narrow down their search results.
+## Technologies Used
+- Python, Flask, SQLAlchemy, Jinja2
+- Bootstrap (frontend)
 
-4. Collaboration and Sharing:
-
-* Users can share notes with other registered users.
-* Collaborative editing allows multiple users to work on the same note simultaneously.
-
-5. Reminders and Notifications:
-
-* Users can set reminders for important notes.
-* Notification system informs users about upcoming reminders or shared note activities.
-
-6. Responsive Design:
-
-* The web application is built with responsive design principles, ensuring optimal user experience across different devices.
-
-7. Data Persistence and Scalability:
-
-* SQLAlchemy is used as the Object-Relational Mapping (ORM) tool, allowing seamless database interactions.
-* The application is designed to handle a large number of users and notes without compromising performance.
-
-8. Customizable User Interface:
-
-* Jinja templating engine allows for flexible and dynamic web page rendering.
-* Users can personalize the appearance of their notes and the overall theme of the application.
-
-## Technical Stack:
-
-Flask: A lightweight web framework for Python.<br>
-SQLAlchemy: An Object-Relational Mapping (ORM) library for database management.<br>
-Jinja: A templating engine for rendering dynamic web pages.<br>
-Python: The programming language used for the back-end logic.
-
-The Flask Notes Web Application aims to provide users with a user-friendly and efficient platform for note-taking and organization. With its extensive set of features and a robust technical stack, it empowers users to stay organized, collaborate, and easily access their notes from any device with an internet connection.
+## License
+MIT License

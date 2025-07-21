@@ -22,19 +22,14 @@ def home():
 
 @views.route('/students', methods=['GET'])
 @login_required
-def class_selection():
-    classes = SchoolClass.query.filter_by(teacher_id=current_user.id).all()
-    return render_template('students.html', classes=classes, user=current_user)
-
-@views.route('/students', methods=['GET'])
-@login_required
 def students_page():
     classes = SchoolClass.query.filter_by(teacher_id=current_user.id).all()
     selected_class_id = request.args.get('class_id', type=int)
     students = []
     if selected_class_id:
         students = Student.query.filter_by(class_id=selected_class_id).all()
-    return render_template('students.html', classes=classes, students=students, selected_class_id=selected_class_id, user=current_user)
+    subjects = Subject.query.all()
+    return render_template('students.html', classes=classes, students=students, selected_class_id=selected_class_id, user=current_user, subjects=subjects)
 
 @views.route('/api/students')
 @login_required
@@ -67,29 +62,29 @@ def grades_table():
     if not selected_student or selected_student.class_id != selected_class_id:
         abort(403)
     grades = Grade.query.filter_by(student_id=selected_student_id).all()
-    # Noten entschlüsseln für Anzeige
+    # Decrypt grades for display
     for g in grades:
         g.decrypted_value = g.get_note()
     subjects = Subject.query.all()
     users = User.query.all()
 
-    # Übersichtsdaten pro Fach vorbereiten
+    # Prepare overview data per subject
     overview_data = []
     for subject in subjects:
         subject_grades = [g for g in grades if g.subject_id == subject.id]
         schulaufgaben = [g for g in subject_grades if g.note_type == 'Schulaufgabe']
         ex_kurz = [g for g in subject_grades if g.note_type in ['Ex', 'Kurzarbeit']]
-        # Noten als Strings mit Komma getrennt
+        # Grades as comma-separated strings
         schulaufgaben_str = ', '.join(str(g.decrypted_value) for g in schulaufgaben)
         ex_kurz_str = ', '.join(str(g.decrypted_value) for g in ex_kurz)
-        # Durchschnitt berechnen (gewichteter Schnitt aller Noten)
+        # Calculate average (weighted average of all grades)
         total = sum(g.decrypted_value * g.weight for g in subject_grades)
         weight_sum = sum(g.weight for g in subject_grades)
         avg = (total / weight_sum) if weight_sum > 0 else None
-        # Abschlussnote: Ø auf bessere Note runden (z.B. 2.5 -> 2)
+        # Final grade: round average to better grade (e.g. 2.5 -> 2)
         abschluss = None
         if avg is not None:
-            # Runden: x.5 immer abrunden (bessere Note), >x.5 aufrunden
+            # Rounding: x.5 always round down (better grade), >x.5 round up
             if avg - int(avg) <= 0.5:
                 abschluss = int(avg)
             else:
@@ -142,7 +137,7 @@ def add_grade():
     school_class = SchoolClass.query.get(student.class_id)
     if not school_class or school_class.teacher_id != current_user.id:
         abort(403)
-    # Temporäre ID für Verschlüsselung (wird nach Commit gesetzt)
+    # Temporary ID for encryption (set after commit)
     temp_id = random.randint(100000, 999999)
     enc_value = encrypt_note(value, temp_id, subject_id, current_user.id)
     new_grade = Grade(
@@ -158,10 +153,10 @@ def add_grade():
     )
     db.session.add(new_grade)
     db.session.commit()
-    # Nach Commit: ID ist gesetzt, Wert neu verschlüsseln
+    # After commit: ID is set, re-encrypt value
     new_grade.value = encrypt_note(value, new_grade.id, subject_id, current_user.id)
     db.session.commit()
-    flash("Note hinzugefügt!", category="success")
+    flash("Note added!", category="success")
     return redirect(url_for('views.grades_table', class_id=student.class_id, student_id=student_id, subject_id=subject_id))
 
 @views.route('/grades/edit/<int:grade_id>', methods=['POST'])
@@ -180,7 +175,7 @@ def edit_grade(grade_id):
     if weight is not None:
         grade.weight = weight
     db.session.commit()
-    flash('Note aktualisiert!', category='success')
+    flash('Grade updated!', category='success')
     class_id = grade.student.class_id
     student_id = grade.student.id
     return redirect(url_for('views.grades_table', class_id=class_id, student_id=student_id))
@@ -198,7 +193,61 @@ def delete_grade(grade_id):
     subject_id = grade.subject_id
     db.session.delete(grade)
     db.session.commit()
-    flash('Note gelöscht!', category='success')
+    flash('Grade deleted!', category='success')
     return redirect(url_for('views.grades_table', class_id=class_id, student_id=student_id, subject_id=subject_id))
+
+@views.route('/grades/bulk_add', methods=['POST'])
+@login_required
+def bulk_add_grades():
+    data = request.get_json()
+    class_id = data.get('class_id')
+    subject_id = data.get('subject_id')
+    note_type = data.get('note_type')
+    date_str = data.get('date')
+    weight = data.get('weight')
+    kommentar = data.get('kommentar')
+    notes = data.get('notes', [])
+
+    # Parse date
+    date = None
+    if date_str:
+        try:
+            date = datetime.strptime(date_str, '%Y-%m-%d')
+        except Exception:
+            date = None
+
+    # Class and teacher check
+    school_class = SchoolClass.query.get(class_id)
+    if not school_class or school_class.teacher_id != current_user.id:
+        return jsonify({'success': False, 'message': 'No permission for this class!'}), 403
+
+    # Save grades
+    for note in notes:
+        student_id = note.get('student_id')
+        value = note.get('value')
+        if value is None or value == '':
+            continue  # No grade for this student
+        student = Student.query.get(student_id)
+        if not student or student.class_id != int(class_id):
+            continue
+        # Encrypt as in single add
+        temp_id = random.randint(100000, 999999)
+        enc_value = encrypt_note(float(value), temp_id, int(subject_id), current_user.id)
+        new_grade = Grade(
+            student_id=student_id,
+            subject_id=subject_id,
+            value=enc_value,
+            weight=weight,
+            note_type=note_type,
+            kommentar=kommentar,
+            date=date,
+            created_by=current_user.id,
+            created_at=datetime.now(ZoneInfo('Europe/Berlin'))
+        )
+        db.session.add(new_grade)
+        db.session.flush()  # So that ID is set
+        new_grade.value = encrypt_note(float(value), new_grade.id, int(subject_id), current_user.id)
+    db.session.commit()
+    return jsonify({'success': True})
 
 

@@ -11,6 +11,61 @@
     {% endfor %}
   </select>
 </div>
+<div class="mb-3" id="bulkAddBtnContainer" style="display:none; justify-content: flex-end;">
+    <button class="btn btn-primary" id="bulkAddBtn">Note hinzufügen</button>
+  </div>
+
+<!-- Modal/Wizard für Bulk-Noten-Eingabe -->
+<div class="modal" tabindex="-1" role="dialog" id="bulkAddModal" style="display:none; background:rgba(0,0,0,0.3); position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:1000; align-items:center; justify-content:center;">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Noten für ganze Klasse eintragen</h5>
+        <button type="button" class="close" onclick="closeBulkAddModal()"><span>&times;</span></button>
+      </div>
+      <div class="modal-body" id="bulkModalBody">
+        <form id="bulkMetaForm">
+          <div class="form-group">
+            <label for="bulkSubject">Fach</label>
+            <select class="form-control" id="bulkSubject" name="subject_id" required>
+              <option value="">-- Fach wählen --</option>
+              {% for subject in subjects %}
+                <option value="{{ subject.id }}">{{ subject.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="bulkNoteType">Art der Note</label>
+            <select class="form-control" id="bulkNoteType" name="note_type" required>
+              <option value="Schulaufgabe">Schulaufgabe</option>
+              <option value="Kurzarbeit">Kurzarbeit</option>
+              <option value="Ex">Ex</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="bulkDate">Datum</label>
+            <input type="date" class="form-control" id="bulkDate" name="date" required value="{{ (now()|date('Y-m-d')) if now else '' }}">
+          </div>
+          <div class="form-group">
+            <label for="bulkWeight">Gewichtung</label>
+            <input type="number" class="form-control" id="bulkWeight" name="weight" step="0.1" value="2.0" required>
+          </div>
+          <div class="form-group">
+            <label for="bulkKommentar">Kommentar (optional)</label>
+            <input type="text" class="form-control" id="bulkKommentar" name="kommentar">
+          </div>
+          <button type="button" class="btn btn-primary" id="startBulkWizard">Weiter zur Noteneingabe</button>
+        </form>
+        <!-- Hier wird das Notenformular für alle Schüler dynamisch eingefügt -->
+        <form id="bulkNotesForm" style="display:none;">
+          <div id="bulkNotesFields"></div>
+          <button type="submit" class="btn btn-success mt-3">Alle Noten speichern</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="students-container" class="mt-4">
   <ul class="list-group">
     {% for student in students %}
@@ -29,12 +84,130 @@
     {% endif %}
   </ul>
 </div>
+
 <script>
+// Öffnet das Modal
+function openBulkAddModal() {
+  document.getElementById('bulkAddModal').style.display = 'flex';
+}
+function closeBulkAddModal() {
+  document.getElementById('bulkAddModal').style.display = 'none';
+}
+document.getElementById('bulkAddBtn')?.addEventListener('click', openBulkAddModal);
+// Wizard-Logik für Schüler-Noteneingabe
+document.getElementById('startBulkWizard')?.addEventListener('click', function() {
+  // Prüfe, ob Fach gewählt wurde
+  const subjectId = document.getElementById('bulkSubject').value;
+  if (!subjectId) {
+    alert('Bitte ein Fach wählen!');
+    return;
+  }
+  // Klasse dynamisch aus dem Dropdown lesen
+  const classSelect = document.getElementById('classSelect');
+  const selectedClassId = classSelect.value;
+  fetch('/api/students?class_id=' + selectedClassId)
+    .then(response => response.json())
+    .then(data => {
+      const students = data.students;
+      if (!students.length) {
+        alert('Keine Schüler in dieser Klasse!');
+        return;
+      }
+      // Notenfelder bauen
+      let fields = '';
+      students.forEach((student, idx) => {
+        fields += `<div class="form-group row align-items-center">
+          <label class="col-sm-6 col-form-label">${student.first_name} ${student.last_name}</label>
+          <div class="col-sm-6">
+            <input type="number" step="1" min="1" max="6" class="form-control bulk-note-input" name="note_${student.id}" data-idx="${idx}" data-student-id="${student.id}" placeholder="Note" ${idx===0 ? 'autofocus' : ''}>
+          </div>
+        </div>`;
+      });
+      document.getElementById('bulkNotesFields').innerHTML = fields;
+      document.getElementById('bulkMetaForm').style.display = 'none';
+      document.getElementById('bulkNotesForm').style.display = 'block';
+      // Entferne jegliche Autofill-Logik: Es soll keine automatische Vorbefüllung der Notenfelder mehr stattfinden
+      const noteInputs = document.querySelectorAll('.bulk-note-input');
+      // (Kein Autofill mehr)
+    });
+});
+
+// Bulk-Noten absenden
+const bulkNotesForm = document.getElementById('bulkNotesForm');
+bulkNotesForm?.addEventListener('submit', function(e) {
+  e.preventDefault();
+  const subjectId = document.getElementById('bulkSubject').value;
+  const noteType = document.getElementById('bulkNoteType').value;
+  const date = document.getElementById('bulkDate').value;
+  const weight = document.getElementById('bulkWeight').value;
+  const kommentar = document.getElementById('bulkKommentar').value;
+  const classSelect = document.getElementById('classSelect');
+  const selectedClassId = classSelect.value;
+  const notes = [];
+  document.querySelectorAll('.bulk-note-input').forEach(input => {
+    const studentId = input.getAttribute('data-student-id');
+    const value = input.value;
+    if (value) {
+      notes.push({student_id: studentId, value: value});
+    }
+  });
+  if (notes.length === 0) {
+    alert('Bitte Note eingeben!');
+    return;
+  }
+  fetch('/grades/bulk_add', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      class_id: selectedClassId,
+      subject_id: subjectId,
+      note_type: noteType,
+      date: date,
+      weight: weight,
+      kommentar: kommentar,
+      notes: notes
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      closeBulkAddModal();
+      // Zeige Bootstrap-Alert
+      const alertBox = document.getElementById('successAlert');
+      alertBox.style.display = 'block';
+      setTimeout(() => {
+        alertBox.style.display = 'none';
+        location.reload();
+      }, 2000);
+    } else {
+      alert(data.message || 'Fehler beim Speichern!');
+    }
+  })
+  .catch(() => alert('Fehler beim Speichern!'));
+});
+// Zurück zum ersten Schritt, wenn Modal geschlossen wird
+function closeBulkAddModal() {
+  document.getElementById('bulkAddModal').style.display = 'none';
+  document.getElementById('bulkMetaForm').style.display = 'block';
+  document.getElementById('bulkNotesForm').style.display = 'none';
+}
+
+document.getElementById('bulkNoteType').addEventListener('change', function() {
+  const weightInput = document.getElementById('bulkWeight');
+  if (this.value === 'Schulaufgabe') {
+    weightInput.value = 2.0;
+  } else {
+    weightInput.value = 1.0;
+  }
+});
+
 document.getElementById('classSelect').addEventListener('change', function() {
   var classId = this.value;
   var container = document.getElementById('students-container');
+  var bulkBtn = document.getElementById('bulkAddBtnContainer');
   if (!classId) {
     container.innerHTML = '<ul class="list-group"><li class="list-group-item text-muted">Keine Schüler in dieser Klasse.</li></ul>';
+    bulkBtn.style.display = 'none';
     return;
   }
   fetch('/api/students?class_id=' + classId)
@@ -58,6 +231,7 @@ document.getElementById('classSelect').addEventListener('change', function() {
       }
       html += '</ul>';
       container.innerHTML = html;
+      bulkBtn.style.display = 'flex';
     });
 });
 </script>
